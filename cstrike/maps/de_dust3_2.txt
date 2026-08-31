@@ -1,0 +1,8 @@
+Dust3 - Bomb/Defuse
+Map created by DaveJ
+Map recreated by lambadi (lambadi888@gmail.com)
+Map optimization by DartSerafim (dartserafim@gmail.com)
+
+The map represents a deserted area, in some places of which boxes 
+with chemicals were left - these are sites that terrorists must blow up.
+
