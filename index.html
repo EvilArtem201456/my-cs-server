@@ -1,9 +1,247 @@
 <!DOCTYPE html>
-<html>
+<html lang="ru">
 <head>
-    <title>CS FastDL</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FastDL - CS 1.6 Сервер</title>
+    <style>
+        /* Стили для приятного внешнего вида */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #1a1a2e;
+            color: #e0e0e0;
+            padding: 20px;
+            min-height: 100vh;
+        }
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            background: #16213e;
+            border-radius: 12px;
+            padding: 30px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+        }
+        h1 {
+            color: #e94560;
+            border-bottom: 2px solid #e94560;
+            padding-bottom: 15px;
+            margin-bottom: 25px;
+            font-weight: 300;
+            letter-spacing: 1px;
+        }
+        .path-info {
+            background: #0f3460;
+            padding: 12px 18px;
+            border-radius: 8px;
+            margin-bottom: 25px;
+            font-size: 14px;
+            color: #aaa;
+            word-break: break-all;
+            border-left: 4px solid #e94560;
+        }
+        .path-info strong {
+            color: #fff;
+        }
+        .file-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 12px;
+        }
+        .file-item {
+            background: #1a1a2e;
+            padding: 12px 16px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            transition: all 0.2s ease;
+            border: 1px solid transparent;
+        }
+        .file-item:hover {
+            background: #0f3460;
+            border-color: #e94560;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(233, 69, 96, 0.2);
+        }
+        .file-item a {
+            color: #4fc3f7;
+            text-decoration: none;
+            font-size: 14px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            max-width: 140px;
+        }
+        .file-item a:hover {
+            color: #fff;
+            text-decoration: underline;
+        }
+        .file-size {
+            font-size: 12px;
+            color: #888;
+            background: #16213e;
+            padding: 2px 8px;
+            border-radius: 12px;
+            white-space: nowrap;
+        }
+        .empty-folder {
+            grid-column: 1 / -1;
+            text-align: center;
+            padding: 40px 20px;
+            color: #666;
+            font-style: italic;
+        }
+        .footer {
+            margin-top: 30px;
+            text-align: center;
+            font-size: 13px;
+            color: #555;
+            border-top: 1px solid #0f3460;
+            padding-top: 20px;
+        }
+        .footer a {
+            color: #e94560;
+            text-decoration: none;
+        }
+        .badge {
+            display: inline-block;
+            background: #e94560;
+            color: #fff;
+            font-size: 10px;
+            padding: 2px 8px;
+            border-radius: 12px;
+            margin-left: 8px;
+            vertical-align: middle;
+        }
+        @media (max-width: 600px) {
+            .container { padding: 15px; }
+            .file-grid { grid-template-columns: 1fr; }
+        }
+    </style>
 </head>
 <body>
-    <h1>FastDL работает!</h1>
+
+<div class="container">
+    <h1>📦 FastDL Storage <span class="badge">CS 1.6</span></h1>
+    
+    <div class="path-info">
+        <strong>🔗 Базовый URL:</strong> 
+        <span id="baseUrlDisplay">https://EvilArtem201456.github.io/my-cs-server-fastdl/</span>
+    </div>
+
+    <div id="fileList" class="file-grid">
+        <!-- Сюда будет подгружен список файлов -->
+        <div class="empty-folder">⏳ Загрузка списка файлов...</div>
+    </div>
+
+    <div class="footer">
+        🖱️ <strong>Клик по файлу</strong> — откроется для просмотра (без скачивания).<br>
+        🔗 Правой кнопкой → <strong>"Сохранить ссылку как"</strong> — скачать файл.
+    </div>
+</div>
+
+<script>
+    (function() {
+        // --- НАСТРОЙКИ (измените под себя) ---
+        const REPO_OWNER = 'EvilArtem201456';
+        const REPO_NAME = 'my-cs-server-fastdl';
+        const BRANCH = 'main'; // или 'master'
+        // Базовый URL вашего GitHub Pages
+        const BASE_URL = 'https://EvilArtem201456.github.io/my-cs-server-fastdl/';
+        // -------------------------------------
+
+        const fileListEl = document.getElementById('fileList');
+        const baseUrlDisplay = document.getElementById('baseUrlDisplay');
+        baseUrlDisplay.textContent = BASE_URL;
+
+        // Функция для форматирования размера файла
+        function formatSize(bytes) {
+            if (bytes === 0) return '0 B';
+            const k = 1024;
+            const sizes = ['B', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+
+        // Функция для получения списка файлов через GitHub API
+        async function fetchFileList() {
+            try {
+                // Используем GitHub API для получения содержимого репозитория
+                const apiUrl = `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/contents/`;
+
+                const response = await fetch(apiUrl, {
+                    headers: {
+                        'Accept': 'application/vnd.github.v3+json'
+                    }
+                });
+
+                if (!response.ok) {
+                    throw new Error(`GitHub API error: ${response.status} ${response.statusText}`);
+                }
+
+                const data = await response.json();
+
+                // Проверяем, что data — это массив
+                if (!Array.isArray(data)) {
+                    throw new Error('Неверный формат ответа от GitHub API');
+                }
+
+                // Фильтруем только файлы (не папки), исключаем index.html и .gitignore
+                const files = data.filter(item => 
+                    item.type === 'file' && 
+                    item.name !== 'index.html' && 
+                    item.name !== '.gitignore' &&
+                    item.name !== 'README.md'
+                );
+
+                if (files.length === 0) {
+                    fileListEl.innerHTML = `<div class="empty-folder">📂 Папка пуста. Загрузите файлы для FastDL.</div>`;
+                    return;
+                }
+
+                // Сортируем файлы по имени
+                files.sort((a, b) => a.name.localeCompare(b.name));
+
+                // Генерируем HTML для каждого файла
+                let html = '';
+                files.forEach(file => {
+                    // Формируем прямую ссылку на файл через GitHub Pages
+                    const fileUrl = `${BASE_URL}${file.name}`;
+                    // Размер файла (если есть)
+                    const size = file.size ? formatSize(file.size) : '—';
+                    
+                    html += `
+                        <div class="file-item">
+                            <a href="${fileUrl}" target="_blank" title="${file.name}">
+                                📄 ${file.name}
+                            </a>
+                            <span class="file-size">${size}</span>
+                        </div>
+                    `;
+                });
+
+                fileListEl.innerHTML = html;
+
+            } catch (error) {
+                console.error('Ошибка загрузки списка файлов:', error);
+                fileListEl.innerHTML = `
+                    <div class="empty-folder" style="color: #e94560;">
+                        ❌ Не удалось загрузить список файлов.<br>
+                        <span style="font-size: 13px; color: #888;">${error.message}</span>
+                    </div>
+                `;
+            }
+        }
+
+        // Запускаем загрузку списка файлов
+        fetchFileList();
+    })();
+</script>
+
 </body>
 </html>
